@@ -9,7 +9,7 @@ lifecycleRuntimeKtx = "2.9.4"
 camerax = "1.5.0"
 fragmentKtx = "1.8.9"
 appcompat = "1.7.1"
-constraintlayout = "2.1.4"
+constraintlayout = "2.2.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

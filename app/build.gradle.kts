@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.opencv.android)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep OpenCV JNI classes (required for native method resolution)
+-keep class org.opencv.** { *; }
+-keep class org.opencv.android.** { *; }
+-keep class org.opencv.core.** { *; }
+-keep class org.opencv.imgproc.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}

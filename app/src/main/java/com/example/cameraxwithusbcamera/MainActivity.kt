@@ -12,6 +12,7 @@ import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalLensFacing
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -30,6 +31,8 @@ class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
 
     private lateinit var cameraExecutor: ExecutorService
+    private var analysisExecutor: ExecutorService? = null
+    private var openCvAnalyzer: OpenCvAnalyzer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+        analysisExecutor = Executors.newSingleThreadExecutor()
     }
 
     private fun takePhoto() {
@@ -111,6 +115,19 @@ class MainActivity : AppCompatActivity() {
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .build()
 
+            // NEW: ImageAnalysis for OpenCV frame processing
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+
+            openCvAnalyzer = OpenCvAnalyzer { result ->
+                runOnUiThread {
+                    viewBinding.analysisResultText.text = result
+                }
+            }
+            imageAnalysis.setAnalyzer(analysisExecutor!!, openCvAnalyzer!!)
+
             // Select back camera as a default
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_EXTERNAL)
@@ -122,7 +139,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture)
+                    this, cameraSelector, preview, imageCapture, imageAnalysis)
 
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
@@ -155,6 +172,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        analysisExecutor?.shutdown()
     }
 
     companion object {

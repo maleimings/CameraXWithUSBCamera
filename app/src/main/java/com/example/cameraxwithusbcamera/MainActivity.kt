@@ -8,10 +8,8 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalLensFacing
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -96,7 +94,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    @OptIn(ExperimentalLensFacing::class)
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -115,22 +112,22 @@ class MainActivity : AppCompatActivity() {
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .build()
 
-            // NEW: ImageAnalysis for OpenCV frame processing
+            // ImageAnalysis for OpenCV frame processing
             val imageAnalysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
 
-            openCvAnalyzer = OpenCvAnalyzer { result ->
+            openCvAnalyzer = OpenCvAnalyzer { edgeResult, trackingResult ->
                 runOnUiThread {
-                    viewBinding.analysisResultText.text = result
+                    viewBinding.analysisResultText.text = edgeResult
+                    viewBinding.directionOverlay.setResult(trackingResult)
                 }
             }
             imageAnalysis.setAnalyzer(analysisExecutor!!, openCvAnalyzer!!)
 
-            // Select back camera as a default
+            // Select the only available camera (USB camera)
             val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_EXTERNAL)
                 .build()
 
             try {

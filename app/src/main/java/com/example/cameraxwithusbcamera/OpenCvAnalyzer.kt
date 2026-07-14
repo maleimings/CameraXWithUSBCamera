@@ -15,7 +15,7 @@ import java.util.Locale
 
 /**
  * An [ImageAnalysis.Analyzer] that converts CameraX YUV_420_888 frames
- * to OpenCV [Mat] and runs Canny edge detection.
+ * to OpenCV [Mat] and runs Canny edge detection plus bottle motion tracking.
  *
  * Rate-limited to at most one analysis every [FRAME_INTERVAL_MS] to avoid
  * overwhelming the CPU and UI thread.
@@ -24,15 +24,17 @@ import java.util.Locale
  * [ImageProxy.PlaneProxy.pixelStride] > 1, which CameraX planes commonly have.
  */
 class OpenCvAnalyzer(
-    private val onAnalysisResult: (String) -> Unit
+    private val onAnalysisResult: (String, TrackingResult) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     companion object {
         private const val TAG = "OpenCvAnalyzer"
         private const val EDGE_THRESHOLD1 = 50.0
         private const val EDGE_THRESHOLD2 = 150.0
-        private const val FRAME_INTERVAL_MS = 500L
+        private const val FRAME_INTERVAL_MS = 200L
     }
+
+    private val bottleTracker = BottleTracker()
 
     private var initAttempted = false
     private var openCvInitialized = false
@@ -67,24 +69,24 @@ class OpenCvAnalyzer(
 
         if (!openCvInitialized) {
             imageProxy.close()
-            onAnalysisResult("OpenCV not loaded")
+            onAnalysisResult("OpenCV not loaded", TrackingResult(null, null, null, 0f, imageProxy.width, imageProxy.height))
             return
         }
 
         if (imageProxy.format != ImageFormat.YUV_420_888) {
-            onAnalysisResult("Unexpected format: ${imageProxy.format}")
+            onAnalysisResult("Unexpected format: ${imageProxy.format}", TrackingResult(null, null, null, 0f, imageProxy.width, imageProxy.height))
             imageProxy.close()
             return
         }
 
         try {
             val rgba = yuv420888ToRgba(imageProxy)
-            val result = analyzeFrame(rgba)
+            val (edgeText, trackingResult) = analyzeFrame(rgba)
             rgba.release()
-            onAnalysisResult(result)
+            onAnalysisResult(edgeText, trackingResult)
         } catch (e: Exception) {
             Log.e(TAG, "Analysis error", e)
-            onAnalysisResult("Error: ${e.message}")
+            onAnalysisResult("Error: ${e.message}", TrackingResult(null, null, null, 0f, imageProxy.width, imageProxy.height))
         } finally {
             imageProxy.close()
         }
@@ -160,11 +162,12 @@ class OpenCvAnalyzer(
     }
 
     /**
-     * Run Canny edge detection and return a human-readable analysis string.
+     * Run Canny edge detection and bottle tracking.
      *
-     * Reports edge pixel percentage, average brightness, and frame dimensions.
+     * Reports edge pixel percentage, average brightness, frame dimensions,
+     * plus the bottle's movement direction.
      */
-    private fun analyzeFrame(rgbaMat: Mat): String {
+    private fun analyzeFrame(rgbaMat: Mat): Pair<String, TrackingResult> {
         val gray = Mat()
         Imgproc.cvtColor(rgbaMat, gray, Imgproc.COLOR_RGBA2GRAY)
 
@@ -180,10 +183,13 @@ class OpenCvAnalyzer(
         edges.release()
         gray.release()
 
-        return String.format(
+        val text = String.format(
             Locale.US,
             "Edges: %.1f%% | Brightness: %.0f | %dx%d",
             edgePercent, brightness, rgbaMat.cols(), rgbaMat.rows()
         )
+
+        val trackingResult = bottleTracker.processFrame(rgbaMat)
+        return Pair(text, trackingResult)
     }
 }
